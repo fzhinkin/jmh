@@ -48,7 +48,9 @@ import java.util.concurrent.TimeUnit;
 @Fork(1)
 public class XCTraceNormProfilerTest {
     @Benchmark
-    public void benchmark() { Blackhole.consumeCPU(10); }
+    public void benchmark() {
+        Blackhole.consumeCPU(10);
+    }
 
     @Test
     public void smokeTest() throws RunnerException {
@@ -69,5 +71,21 @@ public class XCTraceNormProfilerTest {
             Assert.assertTrue(e.getMessage().contains(
                     "Table \"counters-profile\" was not found in the trace results."));
         }
+    }
+
+    @Test
+    public void test() throws RunnerException {
+        try {
+            new XCTraceAsmProfiler("template=Time Profile");
+        } catch (ProfilerException e) {
+            Assume.assumeTrue("Profiler is not supported or cannot be enabled, skipping test", false);
+        }
+
+        Options opts = new OptionsBuilder()
+                .include(Fixtures.getTestMask(this.getClass()))
+                .addProfiler(XCTraceNormProfiler.class,
+                        "pmcEvents=FIXED_CYCLES,FIXED_INSTRUCTIONS")
+                .build();
+        new Runner(opts).runSingle();
     }
 }

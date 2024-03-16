@@ -39,6 +39,8 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * macOS perfnorm profiler based on xctrace utility shipped with Xcode Instruments.
@@ -77,10 +79,15 @@ public class XCTraceNormProfiler implements ExternalProfiler {
     // but these names are the most popular (see files in /usr/share/kpep).
     // On Arm-based CPUs names (in fact, aliases) are usually Instructions and Cycles,
     // on x86-64 CPUs names are usually INST_ALL and ReferenceCycles.
-    private static final String[] INSTRUCTIONS_COUNTERS = new String[]{"Instructions", "INST_ALL"};
-    private static final String[] CYCLES_COUNTERS = new String[]{"Cycles", "ReferenceCycles", "CORE_ACTIVE_CYCLE"};
+    private static final String[] INSTRUCTIONS_COUNTERS = new String[]{
+            "Instructions", "FIXED_INSTRUCTIONS", "INST_ALL"
+    };
+    private static final String[] CYCLES_COUNTERS = new String[]{
+            "Cycles", "ReferenceCycles", "FIXED_CYCLES", "CORE_ACTIVE_CYCLE"
+    };
     private final String tracingTemplate;
     private final Path temporaryFolder;
+    private final Path pkgDir;
     private final TempFile outputFile;
 
     private final long delayMs;
@@ -104,13 +111,30 @@ public class XCTraceNormProfiler implements ExternalProfiler {
         OptionSpec<Boolean> correctOpt = parser.accepts("fixStartTime",
                         "Fix the start time by the time it took to launch.")
                 .withRequiredArg().ofType(Boolean.class).defaultsTo(true);
-
+        OptionSpec<String> pmcEventsOpt = parser.accepts("pmcEvents",
+                        "Comma-separated list of PMC events to sample.")
+                .withOptionalArg().ofType(String.class);
 
         OptionSet options = ProfilerUtils.parseInitLine(initLine, parser);
         tracingTemplate = options.valueOf(templateOpt);
         delayMs = options.valueOf(optDelay);
         lengthMs = options.valueOf(optLength);
         shouldFixStartTime = options.valueOf(correctOpt);
+        List<String> pmcEvents = Collections.emptyList();
+        if (options.hasArgument(pmcEventsOpt)) {
+            pmcEvents = Stream.of(options.valueOf(pmcEventsOpt).split(","))
+                    .map(String::trim)
+                    .filter(e -> !e.isEmpty())
+                    .collect(Collectors.toList());
+        }
+
+        if (!pmcEvents.isEmpty()) {
+            pkgDir = XCTraceSupport.createTemporaryDirectoryName().resolve("instr.instrdst");
+            pkgDir.toFile().getParentFile().mkdirs();
+            XCTraceSupport.buildSamplerPackage(10, pmcEvents, pkgDir);
+        } else {
+            pkgDir = null;
+        }
 
         XCTraceSupport.checkXCTraceWorks();
 
@@ -137,8 +161,16 @@ public class XCTraceNormProfiler implements ExternalProfiler {
 
     @Override
     public Collection<String> addJVMInvokeOptions(BenchmarkParams params) {
-        return XCTraceSupport.recordCommandPrefix(temporaryFolder.toAbsolutePath().toString(),
-                null, tracingTemplate);
+        if (pkgDir == null) {
+            return XCTraceSupport.recordCommandPrefix(temporaryFolder.toAbsolutePath().toString(),
+                    null, tracingTemplate);
+        }
+        List<String> args = new ArrayList<>();
+        Collections.addAll(args, "xctrace", "record",
+                "--package", pkgDir.toAbsolutePath().toString(),
+                "--instrument", "XCTraceNormProfiler",
+                "--output", temporaryFolder.toAbsolutePath().toString(), "--target-stdout", "-", "--launch", "--");
+        return args;
     }
 
     @Override

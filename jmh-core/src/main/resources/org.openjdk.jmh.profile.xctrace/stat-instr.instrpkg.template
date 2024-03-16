@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<package>
+	<id>org.openjdk.jmh.profile.xctrace.normprof</id>
+	<title>XCTraceNormProfiler</title>
+	<owner><name>Duke</name></owner>
+
+    <import-schema>counters-profile</import-schema>
+
+    <instrument>
+        <id>com.apple.dt.time-profiler-example</id>
+            <title>XCTraceNormProfiler</title>
+            <category>System</category>
+            <purpose>Samples PMC for JMH XCTraceNormProfiler</purpose>
+            <icon>CPU Counters</icon>
+            <!-- this one will be passed from xctrace -->
+            <import-parameter>
+                <from-scope>trace</from-scope>
+                <name>?target-pid</name>
+            </import-parameter>
+            <create-table>
+                <id>profile-table</id>
+                <schema-ref>counters-profile</schema-ref>
+                <!-- sample on regular time intervals -->
+                <attribute>
+                    <name>trigger</name>
+                    <string>time</string>
+                </attribute>
+                <attribute>
+                    <name>sample-rate-micro-seconds</name>
+                    <integer>SAMPLING_RATE_MICROS</integer>
+                </attribute>
+                <attribute>
+                    <name>pmc-events</name>
+                    <array>PMC_EVENTS_LIST</array>
+                </attribute>
+                <attribute>
+                    <name>needs-kernel-callstack</name>
+                    <integer>0</integer>
+                </attribute>
+                <attribute>
+                    <name>target-pid</name>
+                    <parameter-ref>?target-pid</parameter-ref>
+                </attribute>
+            </create-table>
+            <!-- this is only required to build the package -->
+            <calltree>
+                <title>Profile</title>
+                <table-ref>profile-table</table-ref>
+                <backtrace-column>stack</backtrace-column>
+                <thread-column>thread</thread-column>
+                <category-column>thread-state</category-column>
+                <weight-column>weight</weight-column>
+            </calltree>
+    </instrument>
+</package>

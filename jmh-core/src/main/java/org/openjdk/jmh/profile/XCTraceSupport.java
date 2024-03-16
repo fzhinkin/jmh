@@ -25,11 +25,20 @@
 package org.openjdk.jmh.profile;
 
 import org.openjdk.jmh.util.Utils;
+import org.w3c.dom.Document;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+import org.xml.sax.SAXException;
 
-import java.io.IOException;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.xpath.*;
+import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -155,5 +164,91 @@ final class XCTraceSupport {
                 return FileVisitResult.CONTINUE;
             }
         });
+    }
+
+    private static final String hwCpuTypePrefix = "hw.cputype: ";
+    private static final String hwCpuSubtypePrefix = "hw.cpusubtype: ";
+    private static final String hwCpuFamily = "hw.cpufamily: ";
+
+
+    static List<String> availablePerformanceMonitoringEvents() {
+        Integer cpuType = null;
+        Integer cpuSubtype = null;
+        Integer cpuFamily = null;
+        List<String> sysctlProps = Utils.runWith("sysctl", "hw")
+                .stream().
+                flatMap(line -> Stream.of(line.split("\n")))
+                .collect(Collectors.toList());
+        for (String prop : sysctlProps) {
+            if (prop.startsWith(hwCpuTypePrefix)) {
+                cpuType = Integer.parseInt(prop.substring(hwCpuTypePrefix.length()));
+            } else if (prop.startsWith(hwCpuSubtypePrefix)) {
+                cpuSubtype = Integer.parseInt(prop.substring(hwCpuSubtypePrefix.length()));
+            } else if (prop.startsWith(hwCpuFamily)) {
+                cpuFamily = Integer.parseInt(prop.substring(hwCpuFamily.length()));
+            }
+        }
+        if (cpuType == null || cpuFamily == null || cpuSubtype == null) {
+            return Collections.emptyList();
+        }
+
+        String kpepFile = String.format("/usr/share/kpep/cpu_%s_%s_%s.plist",
+                Integer.toUnsignedString(cpuType, 16),
+                Integer.toUnsignedString(cpuSubtype, 16),
+                Integer.toUnsignedString(cpuFamily, 16));
+
+        File kpepDb = new File(kpepFile);
+        if (!kpepDb.exists()) {
+            return Collections.emptyList();
+        }
+
+        String dict = String.join("\n", Utils.runWith("plutil", "-extract", "system.cpu.events", "xml1",
+                "-o", "-", kpepFile));
+        DocumentBuilderFactory builderFactory = DocumentBuilderFactory.newInstance();
+        List<String> events = new ArrayList<>();
+        try {
+            Document xmlDict = builderFactory.newDocumentBuilder().parse(
+                    new ByteArrayInputStream(dict.getBytes(StandardCharsets.UTF_8)));
+            NodeList keys = (NodeList) XPathFactory.newInstance().newXPath().compile("/plist/dict/key")
+                    .evaluate(xmlDict, XPathConstants.NODESET);
+            for (int idx = 0; idx < keys.getLength(); idx++) {
+                Node node = keys.item(idx);
+                events.add(node.getTextContent());
+            }
+        } catch (IOException | SAXException | XPathException | ParserConfigurationException e) {
+            throw new IllegalStateException("Unable to parse kpep file: " + kpepFile, e);
+        }
+        return events;
+    }
+
+    static void buildSamplerPackage(long samplingRateMillis, List<String> pmCounters, Path outputPath) {
+        if (pmCounters.isEmpty()) throw new IllegalArgumentException("PMC list is empty");
+        if (samplingRateMillis <= 0) throw new IllegalStateException("Sampling rate should be positive");
+        Set<String> passedCounters = new HashSet<>(pmCounters);
+        passedCounters.removeAll(availablePerformanceMonitoringEvents());
+        if (!passedCounters.isEmpty()) throw new IllegalArgumentException("Unsupported PMC events: " + passedCounters);
+
+        InputStream templateStream = XCTraceSupport.class.getResourceAsStream(
+                "/org.openjdk.jmh.profile.xctrace/stat-instr.instrpkg.template");
+        String template;
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(templateStream))) {
+            template = reader.lines().collect(Collectors.joining("\n"));
+        } catch (IOException e) {
+            throw new IllegalStateException(e);
+        }
+        template = template
+                .replace("SAMPLING_RATE_MICROS", Long.toString(TimeUnit.MILLISECONDS.toMillis(samplingRateMillis)))
+                .replace("PMC_EVENTS_LIST",
+                        pmCounters.stream().map(evt -> "<string>" + evt + "</string>").collect(Collectors.joining()));
+        Path pkgFile;
+        try {
+            pkgFile = Files.createTempFile("", ".instrpkg");
+            Files.write(pkgFile, template.getBytes(StandardCharsets.UTF_8));
+        } catch (IOException e) {
+            throw new IllegalStateException(e);
+        }
+        String xcodePath = "/Applications/Xcode.app/Contents/Developer";//Utils.tryWith("xcode-select", "-p").iterator().next();
+        String instrBuilder = Paths.get(xcodePath, "usr", "bin", "instrumentbuilder").toString();
+        Utils.runWith(instrBuilder, "-o", outputPath.toString(), "-i", pkgFile.toString(), "-l", "CPU Counters");
     }
 }
