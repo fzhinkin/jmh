@@ -47,7 +47,9 @@ public class XCTraceAsmProfilerTest extends AbstractAsmProfilerTest {
         try {
             new XCTraceAsmProfiler("");
         } catch (ProfilerException e) {
-            Assume.assumeTrue("Profiler is not supported or cannot be enabled, skipping test", false);
+            //e.printStackTrace();
+            //Assume.assumeTrue("Profiler is not supported or cannot be enabled, skipping test", false);
+            throw new RuntimeException(e);
         }
     }
 
