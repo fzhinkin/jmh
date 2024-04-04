@@ -31,6 +31,7 @@ import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParserFactory;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.util.Collections;
 import java.util.List;
 
@@ -86,8 +87,12 @@ class XCTraceTableHandler extends DefaultHandler {
     public final void parse(File file) {
         try {
             SAXParserFactory.newInstance().newSAXParser().parse(file, this);
-        } catch (ParserConfigurationException | SAXException | IOException e) {
-            throw new IllegalStateException(e);
+        } catch (Throwable e) {
+            try {
+                throw new IllegalStateException(String.join("\n", Files.readAllLines(file.toPath())), e);
+            } catch (IOException ee) {
+                throw new RuntimeException(e);
+            }
         }
     }
 
