@@ -161,7 +161,14 @@ final class XCTraceTableProfileHandler extends XCTraceTableHandler {
         }
 
         String nameOrAddr = fmt.split("←")[0].trim();
-        return new Frame(-1 /* fake frame */, nameOrAddr, -1 /* need to parse nested text-addresses */);
+        Frame frame = new Frame(-1 /* fake frame */, nameOrAddr, -1 /* need to parse nested text-addresses */);
+        // Legacy backtraces missing info about a library a symbol belongs to. But if a symbol's name is known,
+        // then it's definitely not JIT-compiled code. In that case [unknown] binary name is used to improve profiling
+        // results.
+        if (!nameOrAddr.startsWith("0x")) {
+            frame.binary = "[unknown]";
+        }
+        return frame;
     }
 
     @Override

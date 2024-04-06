@@ -198,7 +198,6 @@ public class XCTraceAsmProfiler extends AbstractPerfAsmProfiler {
             }
             events.add(sample.getAddress());
 
-            // JIT sample
             if (sample.getBinary() != null) {
                 String name = sample.getBinary();
                 if (name.isEmpty()) {
