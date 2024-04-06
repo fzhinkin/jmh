@@ -24,16 +24,11 @@
  */
 package org.openjdk.jmh.profile;
 
-import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
-
-import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParserFactory;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.util.Collections;
-import java.util.List;
 
 /**
  * Base class for SAX handlers responsible for xctrace exported table parsing.
@@ -48,6 +43,7 @@ class XCTraceTableHandler extends DefaultHandler {
     static final String SAMPLE_RATE = "sample-rate-micro-seconds";
     static final String FRAME = "frame";
     static final String BACKTRACE = "backtrace";
+    static final String TEXT_ADDRESSES = "text-addresses";
     static final String BINARY = "binary";
     static final String SAMPLE_TIME = "sample-time";
     static final String ADDRESS = "addr";
