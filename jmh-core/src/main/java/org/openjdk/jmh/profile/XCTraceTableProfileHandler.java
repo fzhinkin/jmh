@@ -263,7 +263,7 @@ final class XCTraceTableProfileHandler extends XCTraceTableHandler {
                 if (isNeedToParseCharacters()) {
                     // peek only the first address as we're not interested in the whole backtrace
                     addresses.value = Arrays.stream(getCharacters().split(" "))
-                            .mapToLong(Long::parseLong).findFirst().orElse(-1);
+                            .mapToLong(Long::parseUnsignedLong).findFirst().orElse(-1);
                 }
                 ValueHolder<Frame> bt = peek();
                 // For legacy backtraces, the address is initially -1. It is then updated by the top-most address
