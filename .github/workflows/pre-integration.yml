@@ -38,6 +38,38 @@ jobs:
         echo -1 | sudo tee /proc/sys/kernel/perf_event_paranoid
         perf stat echo 1
       if: (runner.os == 'Linux')
+    - name: Check and setup kpep files
+      run: |
+        CPU_FAM=$(sysctl -n hw.cpufamily)
+        if [[ $CPU_FAM -lt 0 ]]; then
+            CPU_FAM=$((4294967296 + CPU_FAM))
+        fi
+
+        CPU_TYPE=$(sysctl -n hw.cputype)
+        if [[ $CPU_TYPE -lt 0 ]]; then
+            CPU_TYPE=$((4294967296 + CPU_TYPE))
+        fi
+
+        CPU_SUBTYPE=$(sysctl -n hw.cpusubtype)
+        if [[ $CPU_SUBTYPE -lt 0 ]]; then
+            CPU_SUBTYPE=$((4294967296 + CPU_SUBTYPE))
+        fi
+
+        CPU_FAM_HEX=$(printf "%x" $CPU_FAM)
+        CPU_TYPE_HEX=$(printf "%x" $CPU_TYPE)
+        CPU_SUBTYPE_HEX=$(printf "%x" $CPU_SUBTYPE)
+
+        CPU_STR="cpu_${CPU_TYPE_HEX}_${CPU_SUBTYPE_HEX}_${CPU_FAM_HEX}"
+        echo "CPU string: $CPU_STR"
+
+        if [ ! -f "/usr/share/kpep/${CPU_STR}.plist" ]; then
+            echo "No corresponding kpep file found"
+            IS_ARM=$(sysctl -nq hw.optional.arm64)
+            if [ "$IS_ARM" -eq 1 ]; then
+                sudo mkdir /usr/local/share/kpep/
+                sudo cp /usr/share/kpep/a16.plist "/usr/local/share/kpep/${CPU_STR}.plist"
+            fi
+        fi
     - name: Set up async-profiler (Linux)
       run: |
         curl -L https://github.com/async-profiler/async-profiler/releases/download/v3.0/async-profiler-3.0-linux-x64.tar.gz | tar xzf -

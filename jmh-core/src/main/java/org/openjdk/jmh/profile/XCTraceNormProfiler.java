@@ -94,7 +94,7 @@ public class XCTraceNormProfiler implements ExternalProfiler {
     // FIXED_CYCLES and FIXED_INSTRUCTIONS. In general, it would be better to use fixed events, but it's fine for
     // default settings consisting of only 4 events in total.
     private static final String[] DEFAULT_EVENTS = new String[]{
-            "CORE_ACTIVE_CYCLE", "INST_ALL", "INST_BRANCH", "BRANCH_MISPRED_NONSPEC"
+            "CORE_ACTIVE_CYCLE", "INST_ALL"/*, "INST_BRANCH", "BRANCH_MISPRED_NONSPEC"*/
     };
     private static final String[] CYCLES_EVENT_NAMES = new String[]{
             "CORE_ACTIVE_CYCLE", "Cycles", "FIXED_CYCLES", "CPU_CLK_UNHALTED.THREAD", "CPU_CLK_UNHALTED.THREAD_P"
@@ -158,6 +158,9 @@ public class XCTraceNormProfiler implements ExternalProfiler {
         OptionSet options = ProfilerUtils.parseInitLine(initLine, parser);
 
         File kpepFile = XCTraceSupport.getKpepFilePath();
+        if (!kpepFile.exists()) {
+            kpepFile = new File("/usr/local/share/kpep", kpepFile.getName());
+        }
         if (!kpepFile.exists()) {
             throw new ProfilerException("KPEP database file does not exist: " + kpepFile.getAbsolutePath() +
                     ". Most likely, it means current CPU is either virtualized (we're running inside a VM), or " +
