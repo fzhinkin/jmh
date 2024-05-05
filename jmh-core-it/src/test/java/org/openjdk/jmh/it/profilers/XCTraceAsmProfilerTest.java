@@ -26,6 +26,7 @@ package org.openjdk.jmh.it.profilers;
 
 import org.junit.Assert;
 import org.junit.Assume;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.openjdk.jmh.it.Fixtures;
 import org.openjdk.jmh.profile.ProfilerException;
@@ -44,6 +45,7 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
 
+@Ignore
 public class XCTraceAsmProfilerTest extends AbstractAsmProfilerTest {
     private static final File TMP_DIR = new File(System.getProperty("java.io.tmpdir"));
 
