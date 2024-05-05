@@ -80,12 +80,13 @@ public class XCTraceNormProfilerTest extends AbstractAsmProfilerTest {
 
     private static boolean isInsideVM() {
         // Alternatively, we can check if CPC subsystem is up and running (kern.cpc.secure)
-        String vmmPresent = Utils.runWith("sysctl", "-n", "kern.hv_vmm_present")
-                .iterator()
-                .next()
-                .split("\n")[0];
+        //String vmmPresent = Utils.runWith("sysctl", "-n", "kern.hv_vmm_present")
+        //        .iterator()
+        //        .next()
+        //        .split("\n")[0];
         // It's either 0 or 1 when sysctl property exists, some error string otherwise
-        return vmmPresent.equals("1");
+        //return vmmPresent.equals("1");
+        return false;
     }
 
     private static void skipIfProfilerNotSupport() {
