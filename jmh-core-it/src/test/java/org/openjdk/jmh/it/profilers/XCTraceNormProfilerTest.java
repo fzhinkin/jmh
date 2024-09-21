@@ -36,6 +36,7 @@ import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.RunnerException;
 import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
+import org.openjdk.jmh.util.FileUtils;
 import org.openjdk.jmh.util.Utils;
 
 import java.io.File;
@@ -133,6 +134,56 @@ public class XCTraceNormProfilerTest extends AbstractAsmProfilerTest {
         skipIfRunningInsideVirtualMachine();
 
         checkProfiling(1);
+    }
+
+    @Test
+    public void testFailWithNonExistentTemplate() {
+        skipIfProfilerNotSupport();
+
+        Options opts = new OptionsBuilder()
+                .include(Fixtures.getTestMask(this.getClass()))
+                .addProfiler(XCTraceNormProfiler.class, "template=NON_EXISTENT_TEMPLATE")
+                .forks(1)
+                .build();
+        Assert.assertThrows("No results returned", RunnerException.class, () -> new Runner(opts).runSingle());
+    }
+
+    @Test
+    public void testUnsupportedTemplate() {
+        skipIfProfilerNotSupport();
+        skipIfRunningInsideVirtualMachine();
+
+        Options opts = new OptionsBuilder()
+                .include(Fixtures.getTestMask(this.getClass()))
+                .addProfiler(XCTraceNormProfiler.class, "template=CPU Profiler")
+                .forks(1)
+                .build();
+        Assert.assertThrows("Table \"counters-profile\" was not found in the trace results.",
+                IllegalStateException.class, () -> new Runner(opts).runSingle());
+    }
+
+    @Test
+    public void testUseCustomTemplate() throws Exception {
+        skipIfProfilerNotSupport();
+        skipIfRunningInsideVirtualMachine();
+
+        RunResult result;
+        File templateFile = FileUtils.extractFromResource("/XCTraceNormTestTemplate.xml");
+        Options opts = new OptionsBuilder()
+                .include(Fixtures.getTestMask(this.getClass()))
+                .addProfiler(XCTraceNormProfiler.class, "template=" + templateFile.getAbsolutePath())
+                .forks(1)
+                .build();
+        try {
+            result = new Runner(opts).runSingle();
+        } finally {
+            templateFile.delete();
+        }
+
+        Map<String, Result> sr = result.getSecondaryResults();
+        double instructions = checkedGetAny(sr, "Instructions",
+                "FIXED_INSTRUCTIONS", "INST_ALL", "INST_RETIRED.ANY", "INST_RETIRED.ANY_P");
+        Assert.assertNotEquals(0D, instructions, 0D);
     }
 
     @Test
